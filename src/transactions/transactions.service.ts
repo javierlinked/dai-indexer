@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BigNumber, constants, Contract, providers, utils } from 'ethers';
+import { Contract, formatUnits, WebSocketProvider } from 'ethers';
 import { stats } from 'src/types';
 
 import * as abi from '../abi.json';
@@ -9,14 +9,14 @@ export class TransactionsService {
   address = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
   transactionCounter: number;
   startTime: number;
-  accumulator: BigNumber;
-  provider: providers.WebSocketProvider;
+  accumulator: bigint;
+  provider: WebSocketProvider;
 
   constructor() {
     this.startTime = Date.now();
-    this.accumulator = constants.Zero;
+    this.accumulator = 0n;
     this.transactionCounter = 0;
-    this.provider = new providers.WebSocketProvider(
+    this.provider = new WebSocketProvider(
       `wss://mainnet.infura.io/ws/v3/${process.env.INFURA_KEY}`,
     );
     this.handleEvents();
@@ -30,16 +30,16 @@ export class TransactionsService {
     // The Contract object
     const contract = new Contract(this.address, abi, this.provider);
 
-    contract.on('Transfer', (from: string, to: string, value: BigNumber) => {
+    contract.on('Transfer', (from: string, to: string, value: bigint) => {
       this.transactionCounter++;
-      // native method from BigNumber
-      const sum = this.accumulator.add(value);
+      // native bigint addition
+      const sum = this.accumulator + value;
 
       console.log(
-        `${from} -> ${to} ${utils.formatUnits(
+        `${from} -> ${to} ${formatUnits(
           value,
           'ether',
-        )} DAI, accum: ${utils.formatUnits(sum, 'ether')} DAI`,
+        )} DAI, accum: ${formatUnits(sum, 'ether')} DAI`,
       );
       this.accumulator = sum;
     });
@@ -56,7 +56,7 @@ export class TransactionsService {
       currentTime: Date.now(),
       totalTransactions: this.transactionCounter,
       totalDAITransactions:
-        utils.formatUnits(this.accumulator, 'ether') + ' DAI',
+        formatUnits(this.accumulator, 'ether') + ' DAI',
     };
     return result;
   }
@@ -71,7 +71,7 @@ export class TransactionsService {
     let tx;
     try {
       tx = await this.provider.getTransactionReceipt(id);
-    } catch (error) {
+    } catch {
       return false;
     }
     return this.operationBelongsToDAI(tx);
@@ -80,11 +80,11 @@ export class TransactionsService {
   /**
    * This should cover all DAI transactions, including those that are not part of the contract, e.g. Uniswap
    **/
-  protected operationBelongsToDAI(tx?: providers.TransactionReceipt): boolean {
+  protected operationBelongsToDAI(tx?: any): boolean {
     if (!tx) {
       return false; // transaction not found or pending
     }
-    const logs = tx.logs.map((log) => log.address.toLocaleLowerCase());
+    const logs = tx.logs.map((log: any) => log.address.toLocaleLowerCase());
     return logs.includes(this.address.toLocaleLowerCase());
   }
 }
