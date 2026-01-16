@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Contract, formatUnits, WebSocketProvider } from 'ethers';
+import {
+  Contract,
+  formatUnits,
+  TransactionReceipt,
+  WebSocketProvider,
+} from 'ethers';
 import { stats } from 'src/types';
 
 import * as abi from '../abi.json';
@@ -80,11 +85,13 @@ export class TransactionsService {
   /**
    * This should cover all DAI transactions, including those that are not part of the contract, e.g. Uniswap
    **/
-  protected operationBelongsToDAI(tx?: any): boolean {
+  protected operationBelongsToDAI(
+    tx?: TransactionReceipt | null,
+  ): boolean {
     if (!tx) {
       return false; // transaction not found or pending
     }
-    const logs = tx.logs.map((log: any) => log.address.toLocaleLowerCase());
+    const logs = tx.logs.map((log) => log.address.toLocaleLowerCase());
     return logs.includes(this.address.toLocaleLowerCase());
   }
 }
